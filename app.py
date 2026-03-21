@@ -4,6 +4,10 @@ app = Flask(__name__)
 
 VERIFY_TOKEN = "encanto_token_123"
 
+@app.route("/", methods=["GET"])
+def home():
+    return "Bot activo", 200
+
 @app.route("/webhook", methods=["GET"])
 def verify():
     mode = request.args.get("hub.mode")
@@ -12,12 +16,12 @@ def verify():
 
     if mode == "subscribe" and token == VERIFY_TOKEN:
         return challenge, 200
-    else:
-        return "Error", 403
+
+    return "Error", 403
 
 @app.route("/webhook", methods=["POST"])
 def receive():
-    data = request.json
+    data = request.get_json()
     print("Mensaje recibido:", data)
     return "ok", 200
 
