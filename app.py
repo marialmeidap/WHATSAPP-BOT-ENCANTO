@@ -5,15 +5,10 @@ import os
 app = Flask(__name__)
 
 VERIFY_TOKEN = "encanto_token_123"
-ACCESS_TOKEN = os.environ.get("WHATSAPP_ACCESS_TOKEN")
-PHONE_NUMBER_ID = os.environ.get("WHATSAPP_PHONE_NUMBER_ID")
+ACCESS_TOKEN = os.getenv("WHATSAPP_ACCESS_TOKEN")
+PHONE_NUMBER_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID")
 
-
-@app.route("/", methods=["GET"])
-def home():
-    return "Bot activo", 200
-
-
+# 🔹 VERIFICACIÓN WEBHOOK
 @app.route("/webhook", methods=["GET"])
 def verify():
     mode = request.args.get("hub.mode")
@@ -22,52 +17,48 @@ def verify():
 
     if mode == "subscribe" and token == VERIFY_TOKEN:
         return challenge, 200
+    else:
+        return "Error", 403
 
-    return "Error", 403
-
-
-def send_whatsapp_message(to, body):
-    url = f"https://graph.facebook.com/v22.0/{PHONE_NUMBER_ID}/messages"
-    headers = {
-        "Authorization": f"Bearer {ACCESS_TOKEN}",
-        "Content-Type": "application/json",
-    }
-    payload = {
-        "messaging_product": "whatsapp",
-        "to": to,
-        "type": "text",
-        "text": {"body": body},
-    }
-
-    response = requests.post(url, headers=headers, json=payload)
-    print("Respuesta Meta:", response.status_code, response.text)
-    return response
-
-
+# 🔹 RECIBIR MENSAJES
 @app.route("/webhook", methods=["POST"])
 def receive():
-    data = request.get_json()
-    print("Mensaje recibido:", data)
+    data = request.json
 
     try:
-        entry = data["entry"][0]
-        changes = entry["changes"][0]
-        value = changes["value"]
+        message = data["entry"][0]["changes"][0]["value"]["messages"][0]
+        from_number = message["from"]
+        text = message["text"]["body"]
 
-        if "messages" in value:
-            message = value["messages"][0]
-            from_number = message["from"]
+        print(f"Mensaje de {from_number}: {text}")
 
-            send_whatsapp_message(
-                from_number,
-                "Hola 💕 bienvenida a Encanto Capilar. Gracias por escribirnos."
-            )
+        send_message(from_number, "💖 Hola! Soy Encanto Capilar. ¿En qué puedo ayudarte?")
 
     except Exception as e:
-        print("Error procesando mensaje:", e)
+        print("Error:", e)
 
     return "ok", 200
 
+# 🔹 ENVIAR MENSAJE
+def send_message(to, message):
+    url = f"https://graph.facebook.com/v17.0/{PHONE_NUMBER_ID}/messages"
+
+    headers = {
+        "Authorization": f"Bearer {ACCESS_TOKEN}",
+        "Content-Type": "application/json"
+    }
+
+    data = {
+        "messaging_product": "whatsapp",
+        "to": to,
+        "type": "text",
+        "text": {
+            "body": message
+        }
+    }
+
+    response = requests.post(url, headers=headers, json=data)
+    print(response.text)
 
 if __name__ == "__main__":
     app.run(port=5000)
