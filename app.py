@@ -1,6 +1,7 @@
 from flask import Flask, request
 import requests
 import os
+import time
 
 app = Flask(__name__)
 
@@ -119,17 +120,23 @@ def send_text(to, body):
     response = requests.post(GRAPH_URL, headers=headers, json=payload, timeout=30)
     print("TEXT:", response.status_code, response.text)
 
-def send_image(to, image_url):
+def send_image(to, image_url, caption=None):
     headers = {
         "Authorization": f"Bearer {ACCESS_TOKEN}",
         "Content-Type": "application/json",
     }
+
+    image_data = {"link": image_url}
+    if caption:
+        image_data["caption"] = caption
+
     payload = {
         "messaging_product": "whatsapp",
         "to": to,
         "type": "image",
-        "image": {"link": image_url},
+        "image": image_data,
     }
+
     response = requests.post(GRAPH_URL, headers=headers, json=payload, timeout=30)
     print("IMAGE:", response.status_code, response.text)
 
@@ -168,24 +175,52 @@ def detect_ad_product(message, value):
 
 def send_flow_6_monas(to):
     send_text(to, TEXT_6_MONAS)
-    send_text(to, "*EXTENSIONES LISAS*")
-    for url in IMAGES_LISAS:
-        send_image(to, url)
+    time.sleep(2)
 
-    send_text(to, "*EXTENSIONES CRESPAS*")
-    for url in IMAGES_CRESPAS:
-        send_image(to, url)
+    if IMAGES_LISAS:
+        send_image(to, IMAGES_LISAS[0], "*EXTENSIONES LISAS*")
+        time.sleep(1.5)
 
-    send_text(to, "*EXTENSIONES ONDULADAS*")
-    for url in IMAGES_ONDULADAS:
-        send_image(to, url)
+        for url in IMAGES_LISAS[1:]:
+            send_image(to, url)
+            time.sleep(1.2)
 
+    time.sleep(3)
+
+    if IMAGES_CRESPAS:
+        send_image(to, IMAGES_CRESPAS[0], "*EXTENSIONES CRESPAS*")
+        time.sleep(1.5)
+
+        for url in IMAGES_CRESPAS[1:]:
+            send_image(to, url)
+            time.sleep(1.2)
+
+    time.sleep(3)
+
+    if IMAGES_ONDULADAS:
+        send_image(to, IMAGES_ONDULADAS[0], "*EXTENSIONES ONDULADAS*")
+        time.sleep(1.5)
+
+        for url in IMAGES_ONDULADAS[1:]:
+            send_image(to, url)
+            time.sleep(1.2)
+
+    time.sleep(2)
     send_text(to, ASK_CITY)
 
 def send_flow_clip(to):
     send_text(to, TEXT_CLIP)
-    for url in IMAGES_CLIP:
-        send_image(to, url)
+    time.sleep(2)
+
+    if IMAGES_CLIP:
+        send_image(to, IMAGES_CLIP[0], "*EXTENSIONES CLIP*")
+        time.sleep(1.5)
+
+        for url in IMAGES_CLIP[1:]:
+            send_image(to, url)
+            time.sleep(1.2)
+
+    time.sleep(2)
     send_text(to, ASK_CITY)
 
 @app.route("/", methods=["GET"])
