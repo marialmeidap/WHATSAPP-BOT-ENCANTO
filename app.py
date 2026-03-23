@@ -153,11 +153,29 @@ def send_flow_6_monas(to):
     send_text(to, "*EXTENSIONES LISAS*")
     time.sleep(1)
 
-    if IMAGES_LISAS:
-        send_image(to, IMAGES_LISAS[0])
+    for media_id in IMAGES_LISAS[:3]:
+        send_image(to, media_id)
         time.sleep(1)
 
+    time.sleep(1)
+    send_text(to, "*EXTENSIONES CRESPAS*")
+    time.sleep(1)
+
+    for media_id in IMAGES_CRESPAS[:2]:
+        send_image(to, media_id)
+        time.sleep(1)
+
+    time.sleep(1)
+    send_text(to, "*EXTENSIONES ONDULADAS*")
+    time.sleep(1)
+
+    for media_id in IMAGES_ONDULADAS[:2]:
+        send_image(to, media_id)
+        time.sleep(1)
+
+    time.sleep(1)
     send_text(to, ASK_CITY)
+
 
 def send_flow_clip(to):
     send_text(to, TEXT_CLIP)
@@ -166,10 +184,11 @@ def send_flow_clip(to):
     send_text(to, "*EXTENSIONES CLIP*")
     time.sleep(1)
 
-    if IMAGES_CLIP:
-        send_image(to, IMAGES_CLIP[0])
+    for media_id in IMAGES_CLIP[:3]:
+        send_image(to, media_id)
         time.sleep(1)
 
+    time.sleep(1)
     send_text(to, ASK_CITY)
 
 @app.route("/", methods=["GET"])
