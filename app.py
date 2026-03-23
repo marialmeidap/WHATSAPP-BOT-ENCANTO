@@ -68,12 +68,12 @@ IMAGES_LISAS = [
 ]
 
 IMAGES_CRESPAS = [
-    "https://drive.google.com/uc?export=view&id=1oxaxdH_8kv_-6Y9DhxRB6mvlwNK-3NZ1",
-    "https://drive.google.com/uc?export=view&id=1M65NLkJHE-kGz5aGeGfSRpp_Pnk2byem",
-    "https://drive.google.com/uc?export=view&id=1axDNhobAriZvsXuTWdpESsn7y-YfvZuX",
-    "https://drive.google.com/uc?export=view&id=1NOOeES-M3ukDmjkjsUjdDOfG8s-3zLLU",
-    "https://drive.google.com/uc?export=view&id=1HAMHhMcV7aSaviRPwLMUsEEyvuYrt02T",
-    "https://drive.google.com/uc?export=view&id=1jUt1WjmK-QHI03YriE-0ZSvZ0pR9eQEk"
+    "828484266181382",
+    "1443981077222345",
+    "1499484381693564",
+    "1468342111360744",
+    "911971131810964",
+    "768863612726703"
 ]
 
 IMAGES_ONDULADAS = [
