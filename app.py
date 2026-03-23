@@ -77,10 +77,10 @@ IMAGES_CRESPAS = [
 ]
 
 IMAGES_ONDULADAS = [
-    "https://drive.google.com/uc?export=view&id=1OuhhYQJ4Q_lnIkW9cdIsOh6AqMwaEHYx",
-    "https://drive.google.com/uc?export=view&id=1U8MIdrZFh1HkLHRfyyySEG7FMYMW-hdk",
-    "https://drive.google.com/uc?export=view&id=1F9B3G_HzQ93TWVdHaApzJRl9e8G-maw1",
-    "https://drive.google.com/uc?export=view&id=1ah9yOhfujcQHazGs6hze32C9dUBIGJ9q"
+    "1273230737597278",
+    "912074648403700",
+    "1881908755787004",
+    "1512115730913887"
 ]
 
 IMAGES_CLIP = [
