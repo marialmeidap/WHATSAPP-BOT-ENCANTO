@@ -54,17 +54,17 @@ TEXT_CLIP = """✨ EXTENSIONES SEMI NATURALES CLIP ✨
 ASK_CITY = "¿En qué ciudad te encuentras?"
 
 IMAGES_LISAS = [
-    "https://drive.google.com/uc?export=view&id=19-UNdFZEvoW4JqFsr1ghzxwpjKvF5e4s",
-    "https://drive.google.com/uc?export=view&id=1L7aF3k5xcv99yE-XbWT_mQd9Or3_2uH-",
-    "https://drive.google.com/uc?export=view&id=1tlH6iKlZuEQOH118rhYIyAZgwz8ldmOM",
-    "https://drive.google.com/uc?export=view&id=14rItbLreLMJkKuC9oA0p5R0G25godkXj",
-    "https://drive.google.com/uc?export=view&id=1cCYXrsfxm6SkP1rRAvHAXvAP-XlYWiWR",
-    "https://drive.google.com/uc?export=view&id=13RDBy1fQLtqOwsx5QPZIhoE-gWC20ZTn",
-    "https://drive.google.com/uc?export=view&id=1Lxo6LkXIwKgKfO4Vc_6KgvNZIX2o31yI",
-    "https://drive.google.com/uc?export=view&id=1_mw3uArmXO82vh6u5bzvmgXn1dGy-8W1",
-    "https://drive.google.com/uc?export=view&id=1v2G2k6rMpTAqbx7p_Ss-v6I2QruIBBQu",
-    "https://drive.google.com/uc?export=view&id=17svTKLPzmprjyglIzpbhD8Pl_jRMhxv9",
-    "https://drive.google.com/uc?export=view&id=1fQqChaHO6umfD1Ve75dhyo04xA0hovpG"
+    "1565319357882743",
+    "937334182234863",
+    "1244649211209174",
+    "26384617747894999",
+    "954661733637705",
+    "1428189008608703",
+    "907729562023318",
+    "1456494535880271",
+    "1561714538234849",
+    "1973058493636797",
+    "1432680811161272"
 ]
 
 IMAGES_CRESPAS = [
@@ -120,15 +120,17 @@ def send_text(to, body):
     response = requests.post(GRAPH_URL, headers=headers, json=payload, timeout=30)
     print("TEXT:", response.status_code, response.text)
 
-def send_image(to, image_url, caption=None):
+def send_image(to, image_value):
     headers = {
         "Authorization": f"Bearer {ACCESS_TOKEN}",
         "Content-Type": "application/json",
     }
 
-    image_data = {"link": image_url}
-    if caption:
-        image_data["caption"] = caption
+    # Si son solo números, asumimos media_id de Meta
+    if str(image_value).isdigit():
+        image_data = {"id": image_value}
+    else:
+        image_data = {"link": image_value}
 
     payload = {
         "messaging_product": "whatsapp",
