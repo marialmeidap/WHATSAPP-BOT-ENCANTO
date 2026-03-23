@@ -2,7 +2,6 @@ from flask import Flask, request
 import requests
 import os
 import time
-import threading
 
 app = Flask(__name__)
 
@@ -12,10 +11,8 @@ PHONE_NUMBER_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID")
 
 GRAPH_URL = f"https://graph.facebook.com/v22.0/{PHONE_NUMBER_ID}/messages"
 
-# Memoria simple MVP
 responded_users = set()
 processed_message_ids = set()
-processing_users = set()
 
 ORGANIC_KEYWORDS = [
     "hola", "buenas", "ola", "info", "información", "precio", "buen dia",
@@ -56,46 +53,13 @@ TEXT_CLIP = """✨ EXTENSIONES SEMI NATURALES CLIP ✨
 
 ASK_CITY = "¿En qué ciudad te encuentras?"
 
+# Por ahora probamos SOLO 1 imagen
 IMAGES_LISAS = [
-    "1565319357882743",
-    "937334182234863",
-    "1244649211209174",
-    "26384617747894999",
-    "954661733637705",
-    "1428189008608703",
-    "907729562023318",
-    "1456494535880271",
-    "1561714538234849",
-    "1973058493636797",
-    "1432680811161272"
-]
-
-IMAGES_CRESPAS = [
-    "828484266181382",
-    "1443981077222345",
-    "1499484381693564",
-    "1468342111360744",
-    "911971131810964",
-    "768863612726703"
-]
-
-IMAGES_ONDULADAS = [
-    "1273230737597278",
-    "912074648403700",
-    "1881908755787004",
-    "1512115730913887"
+    "1565319357882743"
 ]
 
 IMAGES_CLIP = [
-    "1464591795317429",
-    "1460397305827405",
-    "1457464749426706",
-    "1471791208017752",
-    "1465807678319486",
-    "2012295003036663",
-    "2445441919220843",
-    "2212782709547264",
-    "824009070011832"
+    "1464591795317429"
 ]
 
 AD_PRODUCT_MAP = {
@@ -114,6 +78,7 @@ def send_text(to, body):
         "Authorization": f"Bearer {ACCESS_TOKEN}",
         "Content-Type": "application/json",
     }
+
     payload = {
         "messaging_product": "whatsapp",
         "recipient_type": "individual",
@@ -127,32 +92,25 @@ def send_text(to, body):
     print("TEXT RESPONSE:", response.text)
     return response
 
-def send_image(to, image_value):
+def send_image(to, media_id):
     headers = {
         "Authorization": f"Bearer {ACCESS_TOKEN}",
         "Content-Type": "application/json",
     }
-
-    if str(image_value).isdigit():
-        image_data = {"id": str(image_value)}
-    else:
-        image_data = {"link": image_value}
 
     payload = {
         "messaging_product": "whatsapp",
         "recipient_type": "individual",
         "to": str(to),
         "type": "image",
-        "image": image_data,
+        "image": {"id": str(media_id)},
     }
 
     print("PAYLOAD IMAGE:", payload)
 
     response = requests.post(GRAPH_URL, headers=headers, json=payload, timeout=30)
-
     print("IMAGE STATUS:", response.status_code)
     print("IMAGE RESPONSE:", response.text)
-
     return response
 
 def normalize_text(text):
@@ -190,52 +148,29 @@ def detect_ad_product(message, value):
 
 def send_flow_6_monas(to):
     send_text(to, TEXT_6_MONAS)
-    time.sleep(1.5)
+    time.sleep(1)
 
     send_text(to, "*EXTENSIONES LISAS*")
-    time.sleep(1.5)
+    time.sleep(1)
 
-    # PRUEBA: solo 1 imagen primero
     if IMAGES_LISAS:
         send_image(to, IMAGES_LISAS[0])
+        time.sleep(1)
 
-    time.sleep(1.5)
     send_text(to, ASK_CITY)
 
 def send_flow_clip(to):
     send_text(to, TEXT_CLIP)
-    time.sleep(1.5)
+    time.sleep(1)
 
     send_text(to, "*EXTENSIONES CLIP*")
-    time.sleep(1.5)
+    time.sleep(1)
 
-    # PRUEBA: solo 1 imagen primero
     if IMAGES_CLIP:
         send_image(to, IMAGES_CLIP[0])
+        time.sleep(1)
 
-    time.sleep(1.5)
     send_text(to, ASK_CITY)
-
-def process_user_message(from_number, text, ad_product):
-    try:
-        if ad_product == "6_monas":
-            send_flow_6_monas(from_number)
-            return
-
-        if ad_product == "clip":
-            send_flow_clip(from_number)
-            return
-
-        if is_organic_message(text):
-            send_flow_6_monas(from_number)
-            return
-
-        send_flow_6_monas(from_number)
-
-    except Exception as e:
-        print("ERROR EN FLUJO:", str(e))
-    finally:
-        processing_users.discard(from_number)
 
 @app.route("/", methods=["GET"])
 def home():
@@ -269,7 +204,6 @@ def receive():
         from_number = message["from"]
         message_id = message.get("id")
 
-        # Evitar duplicados por reintentos de Meta
         if message_id and message_id in processed_message_ids:
             print("MENSAJE REPETIDO IGNORADO:", message_id)
             return "ok", 200
@@ -277,14 +211,8 @@ def receive():
         if message_id:
             processed_message_ids.add(message_id)
 
-        # Si ya respondió una vez, ya no vuelve a hablar
         if from_number in responded_users:
             print(f"{from_number} ya recibió respuesta inicial. No responder.")
-            return "ok", 200
-
-        # Si ya se está procesando, ignorar
-        if from_number in processing_users:
-            print(f"{from_number} ya está en procesamiento. Ignorar retry.")
             return "ok", 200
 
         text = get_message_text(message)
@@ -294,16 +222,21 @@ def receive():
         print("TEXTO:", text)
         print("PRODUCTO DETECTADO:", ad_product)
 
-        # Marcar antes de enviar para evitar loops
         responded_users.add(from_number)
-        processing_users.add(from_number)
 
-        thread = threading.Thread(
-            target=process_user_message,
-            args=(from_number, text, ad_product),
-            daemon=True
-        )
-        thread.start()
+        if ad_product == "clip":
+            send_flow_clip(from_number)
+            return "ok", 200
+
+        if ad_product == "6_monas":
+            send_flow_6_monas(from_number)
+            return "ok", 200
+
+        if is_organic_message(text):
+            send_flow_6_monas(from_number)
+            return "ok", 200
+
+        send_flow_6_monas(from_number)
 
     except Exception as e:
         print("ERROR PROCESANDO WEBHOOK:", str(e))
