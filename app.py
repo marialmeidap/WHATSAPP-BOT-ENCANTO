@@ -150,30 +150,36 @@ def send_flow_6_monas(to):
     send_text(to, TEXT_6_MONAS)
     time.sleep(1)
 
-    send_text(to, "*EXTENSIONES LISAS*")
+    # LISAS
+    send_text(to, "✨ EXTENSIONES LISAS DISPONIBLES")
     time.sleep(1)
 
-    for media_id in IMAGES_LISAS[:3]:
+    for media_id in IMAGES_LISAS[:5]:
         send_image(to, media_id)
-        time.sleep(1)
+        time.sleep(0.8)
 
     time.sleep(1)
-    send_text(to, "*EXTENSIONES CRESPAS*")
+
+    # CRESPAS
+    send_text(to, "🔥 EXTENSIONES CRESPAS (FULL VOLUMEN)")
     time.sleep(1)
 
-    for media_id in IMAGES_CRESPAS[:2]:
+    for media_id in IMAGES_CRESPAS[:4]:
         send_image(to, media_id)
-        time.sleep(1)
+        time.sleep(0.8)
 
     time.sleep(1)
-    send_text(to, "*EXTENSIONES ONDULADAS*")
+
+    # ONDULADAS
+    send_text(to, "🌊 LOOSE WAVE (ONDULADAS NATURALES)")
     time.sleep(1)
 
-    for media_id in IMAGES_ONDULADAS[:2]:
+    for media_id in IMAGES_ONDULADAS[:4]:
         send_image(to, media_id)
-        time.sleep(1)
+        time.sleep(0.8)
 
     time.sleep(1)
+
     send_text(to, ASK_CITY)
 
 
