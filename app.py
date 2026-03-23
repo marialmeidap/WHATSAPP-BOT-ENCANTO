@@ -84,15 +84,15 @@ IMAGES_ONDULADAS = [
 ]
 
 IMAGES_CLIP = [
-    "https://drive.google.com/uc?export=view&id=1MWV76NbvUpOfSNF3tVvGL4WpUq-q8dCa",
-    "https://drive.google.com/uc?export=view&id=1HrSpgC4Mj-f5eY1G2Aze50l8lDCNcA52",
-    "https://drive.google.com/uc?export=view&id=1XuUlh641_Oqlu5OkI13CqCeRGrSqkILN",
-    "https://drive.google.com/uc?export=view&id=1bWXry_6PWg7AVI7pNt43KVqjFiZayrOK",
-    "https://drive.google.com/uc?export=view&id=14-q-vFvt07alg5SKLlJ18VgaZAECefgi",
-    "https://drive.google.com/uc?export=view&id=19pYapMt3i00FmsrE02FIFl7DLtkfMk_i",
-    "https://drive.google.com/uc?export=view&id=1b84EKpLdnjUSLvyPfrYZstQP_xdpSDCy",
-    "https://drive.google.com/uc?export=view&id=1GOyEYY1RAGGEX3kwrmGAVqg4q8aYzsXm",
-    "https://drive.google.com/uc?export=view&id=1-HJmhlk0ykg09xqi7Xcm3hpX12YvWgVD"
+    "1464591795317429",
+    "1460397305827405",
+    "1457464749426706",
+    "1471791208017752",
+    "1465807678319486",
+    "2012295003036663",
+    "2445441919220843",
+    "2212782709547264",
+    "824009070011832"
 ]
 
 AD_PRODUCT_MAP = {
