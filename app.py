@@ -2,8 +2,6 @@ from flask import Flask, request
 import requests
 import os
 import time
-import threading
-import queue
 
 app = Flask(__name__)
 
@@ -13,16 +11,13 @@ PHONE_NUMBER_ID = os.getenv("1035347582995035")
 
 GRAPH_URL = f"https://graph.facebook.com/v22.0/{PHONE_NUMBER_ID}/messages"
 
-# ===== Estado en memoria =====
-processed_message_ids = set()
 responded_users = set()
-processing_users = set()
-job_queue = queue.Queue()
+processed_message_ids = set()
 
 ORGANIC_KEYWORDS = [
     "hola", "buenas", "ola", "info", "información", "precio", "buen dia",
     "buen día", "disponible", "tienes", "me interesa", "buenas tardes",
-    "buenas noches", ".", "ok"
+    "buenas noches"
 ]
 
 TEXT_6_MONAS = """✨ EXTENSIONES PREMIUM ✨
@@ -58,6 +53,7 @@ TEXT_CLIP = """✨ EXTENSIONES SEMI NATURALES CLIP ✨
 
 ASK_CITY = "¿En qué ciudad te encuentras?"
 
+# Imagenes subidas a Meta
 IMAGES_LISAS = [
     "1565319357882743",
     "937334182234863",
@@ -100,10 +96,15 @@ IMAGES_CLIP = [
     "824009070011832"
 ]
 
-# Reemplaza estos IDs cuando tengas los reales
-AD_ID_MAP = {
-    # "123456789012345": "clip",
-    # "987654321098765": "6_monas",
+AD_PRODUCT_MAP = {
+    "6_monas": "6_monas",
+    "6 monas": "6_monas",
+    "extension 6 moñas": "6_monas",
+    "clip": "clip",
+    "instala facil": "clip",
+    "instala fácil": "clip",
+    "clip instala facil": "clip",
+    "clip instala fácil": "clip",
 }
 
 def send_text(to, body):
@@ -111,6 +112,7 @@ def send_text(to, body):
         "Authorization": f"Bearer {ACCESS_TOKEN}",
         "Content-Type": "application/json",
     }
+
     payload = {
         "messaging_product": "whatsapp",
         "recipient_type": "individual",
@@ -118,15 +120,18 @@ def send_text(to, body):
         "type": "text",
         "text": {"body": body},
     }
-    r = requests.post(GRAPH_URL, headers=headers, json=payload, timeout=30)
-    print("TEXT:", r.status_code, r.text)
-    return r
+
+    response = requests.post(GRAPH_URL, headers=headers, json=payload, timeout=30)
+    print("TEXT STATUS:", response.status_code)
+    print("TEXT RESPONSE:", response.text)
+    return response
 
 def send_image(to, media_id):
     headers = {
         "Authorization": f"Bearer {ACCESS_TOKEN}",
         "Content-Type": "application/json",
     }
+
     payload = {
         "messaging_product": "whatsapp",
         "recipient_type": "individual",
@@ -134,9 +139,11 @@ def send_image(to, media_id):
         "type": "image",
         "image": {"id": str(media_id)},
     }
-    r = requests.post(GRAPH_URL, headers=headers, json=payload, timeout=30)
-    print("IMAGE:", r.status_code, r.text)
-    return r
+
+    response = requests.post(GRAPH_URL, headers=headers, json=payload, timeout=30)
+    print("IMAGE STATUS:", response.status_code)
+    print("IMAGE RESPONSE:", response.text)
+    return response
 
 def normalize_text(text):
     return (text or "").strip().lower()
@@ -145,7 +152,7 @@ def is_organic_message(text):
     text = normalize_text(text)
     if not text:
         return True
-    return any(k in text for k in ORGANIC_KEYWORDS)
+    return any(keyword in text for keyword in ORGANIC_KEYWORDS)
 
 def get_message_text(message):
     if message.get("type") == "text":
@@ -153,102 +160,57 @@ def get_message_text(message):
     return ""
 
 def detect_ad_product(message, value):
-    # 1) si logras extraer ad_id exacto del webhook
-    possible_ids = []
-
-    referral = message.get("referral", {})
+    candidates = []
     context = message.get("context", {})
+    referral = message.get("referral", {})
 
-    for obj in [referral, context, value]:
+    for obj in [context, referral, value]:
         if isinstance(obj, dict):
-            for k, v in obj.items():
+            for v in obj.values():
                 if isinstance(v, str):
-                    if v in AD_ID_MAP:
-                        return AD_ID_MAP[v]
-                    possible_ids.append(v)
+                    candidates.append(v.lower())
 
-    # 2) fallback temporal: si vino de anuncio y solo tienes clip activo
-    blob = str(value).lower()
-    if "referral" in blob or "ctwa" in blob:
-        return "clip"
+    joined = " | ".join(candidates)
+
+    for key, product in AD_PRODUCT_MAP.items():
+        if key in joined:
+            return product
 
     return None
 
-def send_chunked_images(to, images, first_chunk, second_chunk=None, pause_between_chunks=2):
-    for media_id in images[0:first_chunk]:
+def send_block(to, images, pause_each=0.35, pause_after=0.8):
+    for media_id in images:
         send_image(to, media_id)
-        time.sleep(1)
-
-    if second_chunk is not None and len(images) > first_chunk:
-        time.sleep(pause_between_chunks)
-        for media_id in images[first_chunk:second_chunk]:
-            send_image(to, media_id)
-            time.sleep(1)
+        time.sleep(pause_each)
+    time.sleep(pause_after)
 
 def send_flow_6_monas(to):
     send_text(to, TEXT_6_MONAS)
-    time.sleep(1.5)
+    time.sleep(0.8)
 
     send_text(to, "✨ EXTENSIONES LISAS DISPONIBLES")
-    time.sleep(1)
-    send_chunked_images(to, IMAGES_LISAS, first_chunk=5, second_chunk=11, pause_between_chunks=2)
+    time.sleep(0.5)
+    send_block(to, IMAGES_LISAS, pause_each=0.35, pause_after=0.8)
 
-    time.sleep(2)
     send_text(to, "🔥 EXTENSIONES CRESPAS (FULL VOLUMEN)")
-    time.sleep(1)
-    send_chunked_images(to, IMAGES_CRESPAS, first_chunk=3, second_chunk=6, pause_between_chunks=2)
+    time.sleep(0.5)
+    send_block(to, IMAGES_CRESPAS, pause_each=0.35, pause_after=0.8)
 
-    time.sleep(2)
     send_text(to, "🌊 LOOSE WAVE (ONDULADAS NATURALES)")
-    time.sleep(1)
-    send_chunked_images(to, IMAGES_ONDULADAS, first_chunk=4, second_chunk=None, pause_between_chunks=2)
+    time.sleep(0.5)
+    send_block(to, IMAGES_ONDULADAS, pause_each=0.35, pause_after=0.8)
 
-    time.sleep(2)
     send_text(to, ASK_CITY)
 
 def send_flow_clip(to):
     send_text(to, TEXT_CLIP)
-    time.sleep(1.5)
+    time.sleep(0.8)
 
     send_text(to, "*EXTENSIONES CLIP*")
-    time.sleep(1)
-    send_chunked_images(to, IMAGES_CLIP, first_chunk=5, second_chunk=9, pause_between_chunks=2)
+    time.sleep(0.5)
+    send_block(to, IMAGES_CLIP, pause_each=0.35, pause_after=0.8)
 
-    time.sleep(2)
     send_text(to, ASK_CITY)
-
-def process_job(job):
-    from_number = job["from_number"]
-    text = job["text"]
-    ad_product = job["ad_product"]
-
-    try:
-        print("PROCESSING JOB:", job)
-
-        if ad_product == "clip":
-            send_flow_clip(from_number)
-        elif ad_product == "6_monas":
-            send_flow_6_monas(from_number)
-        elif is_organic_message(text):
-            send_flow_6_monas(from_number)
-        else:
-            send_flow_6_monas(from_number)
-
-    except Exception as e:
-        print("ERROR EN FLUJO:", str(e))
-    finally:
-        processing_users.discard(from_number)
-
-def worker():
-    while True:
-        job = job_queue.get()
-        try:
-            process_job(job)
-        finally:
-            job_queue.task_done()
-
-worker_thread = threading.Thread(target=worker, daemon=True)
-worker_thread.start()
 
 @app.route("/", methods=["GET"])
 def home():
@@ -262,19 +224,20 @@ def verify():
 
     if mode == "subscribe" and token == VERIFY_TOKEN:
         return challenge, 200
+
     return "Error", 403
 
 @app.route("/webhook", methods=["POST"])
 def receive():
     data = request.get_json()
-    print("WEBHOOK:", data)
+    print("WEBHOOK RECIBIDO:", data)
 
     try:
         entry = data["entry"][0]
         changes = entry["changes"][0]
         value = changes["value"]
 
-        # Ignorar status callbacks
+        # ignorar status sent/delivered/read
         if "statuses" in value:
             return "ok", 200
 
@@ -284,14 +247,7 @@ def receive():
         message = value["messages"][0]
         from_number = message["from"]
         message_id = message.get("id")
-        text = get_message_text(message)
-        ad_product = detect_ad_product(message, value)
 
-        print("NUMERO:", from_number)
-        print("TEXTO:", text)
-        print("PRODUCTO DETECTADO:", ad_product)
-
-        # Deduplicar por message_id
         if message_id and message_id in processed_message_ids:
             print("MENSAJE REPETIDO IGNORADO:", message_id)
             return "ok", 200
@@ -299,29 +255,35 @@ def receive():
         if message_id:
             processed_message_ids.add(message_id)
 
-        # Si ya recibió flujo, no volver a responder
         if from_number in responded_users:
             print(f"{from_number} ya recibió respuesta inicial. No responder.")
             return "ok", 200
 
-        # Si ya está procesándose, no reenfile
-        if from_number in processing_users:
-            print(f"{from_number} ya está en procesamiento. Ignorar retry.")
+        text = get_message_text(message)
+        ad_product = detect_ad_product(message, value)
+
+        print("NUMERO:", from_number)
+        print("TEXTO:", text)
+        print("PRODUCTO DETECTADO:", ad_product)
+
+        responded_users.add(from_number)
+
+        if ad_product == "clip":
+            send_flow_clip(from_number)
             return "ok", 200
 
-        # Marcar ANTES de responder a Meta
-        responded_users.add(from_number)
-        processing_users.add(from_number)
+        if ad_product == "6_monas":
+            send_flow_6_monas(from_number)
+            return "ok", 200
 
-        # Encolar trabajo y responder inmediato
-        job_queue.put({
-            "from_number": from_number,
-            "text": text,
-            "ad_product": ad_product
-        })
+        if is_organic_message(text):
+            send_flow_6_monas(from_number)
+            return "ok", 200
+
+        send_flow_6_monas(from_number)
 
     except Exception as e:
-        print("ERROR WEBHOOK:", str(e))
+        print("ERROR PROCESANDO WEBHOOK:", str(e))
 
     return "ok", 200
 
