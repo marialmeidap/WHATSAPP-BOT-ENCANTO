@@ -255,9 +255,9 @@ def receive():
         if message_id:
             processed_message_ids.add(message_id)
 
-        #if from_number in responded_users:
-            #print(f"{from_number} ya recibió respuesta inicial. No responder.")
-            #return "ok", 200
+        if from_number in responded_users:
+            print(f"{from_number} ya recibió respuesta inicial. No responder.")
+            return "ok", 200
 
         text = get_message_text(message)
         ad_product = detect_ad_product(message, value)
