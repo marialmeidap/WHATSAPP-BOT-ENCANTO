@@ -182,32 +182,49 @@ def detect_ad_product(message, value):
 
 def send_flow_6_monas(to):
     send_text(to, TEXT_6_MONAS)
-    time.sleep(1)
+    time.sleep(1.5)
 
+    # LISAS (11)
     send_text(to, "✨ EXTENSIONES LISAS DISPONIBLES")
     time.sleep(1)
 
-    for media_id in IMAGES_LISAS[:11]:
+    for i, media_id in enumerate(IMAGES_LISAS[:11]):
         send_image(to, media_id)
-        time.sleep(1)
 
-    time.sleep(1)
+        if (i + 1) % 4 == 0:
+            time.sleep(2.5)  # pausa fuerte cada 4
+        else:
+            time.sleep(0.9)
+
+    time.sleep(2)
+
+    # CRESPAS (6)
     send_text(to, "🔥 EXTENSIONES CRESPAS (FULL VOLUMEN)")
     time.sleep(1)
 
-    for media_id in IMAGES_CRESPAS[:6]:
+    for i, media_id in enumerate(IMAGES_CRESPAS[:6]):
         send_image(to, media_id)
-        time.sleep(1)
 
-    time.sleep(1)
+        if (i + 1) % 3 == 0:
+            time.sleep(2)
+        else:
+            time.sleep(0.9)
+
+    time.sleep(2)
+
+    # ONDULADAS (4)
     send_text(to, "🌊 LOOSE WAVE (ONDULADAS NATURALES)")
     time.sleep(1)
 
-    for media_id in IMAGES_ONDULADAS[:4]:
+    for i, media_id in enumerate(IMAGES_ONDULADAS[:4]):
         send_image(to, media_id)
         time.sleep(1)
 
+    time.sleep(2)
+
+    send_text(to, "😍 ¿Cuál te gusta más? Lisas, crespas o onduladas?")
     time.sleep(1)
+
     send_text(to, ASK_CITY)
 
 def send_flow_clip(to):
