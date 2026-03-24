@@ -184,30 +184,39 @@ def send_flow_6_monas(to):
     send_text(to, TEXT_6_MONAS)
     time.sleep(1)
 
+    # LISAS (11)
     send_text(to, "✨ EXTENSIONES LISAS DISPONIBLES")
     time.sleep(1)
 
-    for media_id in IMAGES_LISAS:
+    for media_id in IMAGES_LISAS[:11]:
         send_image(to, media_id)
         time.sleep(1)
 
     time.sleep(1)
+
+    # CRESPAS (6)
     send_text(to, "🔥 EXTENSIONES CRESPAS (FULL VOLUMEN)")
     time.sleep(1)
 
-    for media_id in IMAGES_CRESPAS:
+    for media_id in IMAGES_CRESPAS[:6]:
         send_image(to, media_id)
         time.sleep(1)
 
     time.sleep(1)
+
+    # ONDULADAS (4)
     send_text(to, "🌊 LOOSE WAVE (ONDULADAS NATURALES)")
     time.sleep(1)
 
-    for media_id in IMAGES_ONDULADAS:
+    for media_id in IMAGES_ONDULADAS[:4]:
         send_image(to, media_id)
         time.sleep(1)
 
     time.sleep(1)
+
+    send_text(to, "😍 ¿Cuál te gusta más? Lisas, crespas o onduladas?")
+    time.sleep(1)
+
     send_text(to, ASK_CITY)
 
 def send_flow_clip(to):
