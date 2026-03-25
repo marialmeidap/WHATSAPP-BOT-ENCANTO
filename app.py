@@ -442,8 +442,8 @@ def receive():
         text = get_message_text(message)
         origin, product = get_origin_and_product(message, value, text)
         # PRUEBA TEMPORAL CORTINA
-        origin = "ad_clip_test"
-        product = "clip"
+        #origin = "ad_clip_test"
+        #product = "clip"
 
         print("NUMERO:", from_number)
         print("TEXTO:", text)
@@ -451,8 +451,8 @@ def receive():
         print("PRODUCT:", product)
 
         # decidir si responder o no
-        #if not should_auto_reply(from_number, origin):
-            #return "ok", 200
+        if not should_auto_reply(from_number, origin):
+            return "ok", 200
 
         # enviar flujo
         if product == "clip":
