@@ -2,6 +2,8 @@ from flask import Flask, request
 import requests
 import os
 import time
+import sqlite3
+from contextlib import closing
 
 app = Flask(__name__)
 
@@ -10,9 +12,10 @@ ACCESS_TOKEN = os.getenv("WHATSAPP_ACCESS_TOKEN")
 PHONE_NUMBER_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID")
 
 GRAPH_URL = f"https://graph.facebook.com/v22.0/{PHONE_NUMBER_ID}/messages"
+DB_PATH = os.getenv("DB_PATH", "bot_state.db")
 
-responded_users = set()
-processed_message_ids = set()
+# 7 días
+REPLY_COOLDOWN_SECONDS = 7 * 24 * 60 * 60
 
 ORGANIC_KEYWORDS = [
     "hola", "buenas", "ola", "info", "información", "precio", "buen dia",
@@ -53,7 +56,7 @@ TEXT_CLIP = """✨ EXTENSIONES SEMI NATURALES CLIP ✨
 
 ASK_CITY = "¿En qué ciudad te encuentras?"
 
-# Imagenes subidas a Meta
+# Imágenes subidas a Meta
 IMAGES_LISAS = [
     "1565319357882743",
     "937334182234863",
@@ -96,17 +99,99 @@ IMAGES_CLIP = [
     "824009070011832"
 ]
 
-AD_PRODUCT_MAP = {
-    "6_monas": "6_monas",
-    "6 monas": "6_monas",
-    "extension 6 moñas": "6_monas",
-    "clip": "clip",
-    "instala facil": "clip",
-    "instala fácil": "clip",
-    "clip instala facil": "clip",
-    "clip instala fácil": "clip",
+# =========================================================
+# BIBLIOTECA DE ANUNCIOS -> PRODUCTO / ORIGEN
+# Aquí metes IDs reales de anuncios, campañas o textos clave
+# =========================================================
+AD_SOURCE_MAP = {
+    # EJEMPLOS:
+    # "123456789012345": {"origin": "ad_clip_main", "product": "clip"},
+    # "987654321098765": {"origin": "ad_6_monas_main", "product": "6_monas"},
 }
 
+# Fallback por palabras si todavía no has llenado los IDs
+CLIP_KEYWORDS = [
+    "clip", "cortina", "cortinas", "5 clips",
+    "instala facil", "instala fácil", "semi natural clip"
+]
+
+MONAS_KEYWORDS = [
+    "6_monas", "6 monas", "6 moñas", "moñas",
+    "extension 6 moñas", "extensiones premium",
+    "loose wave", "crespas", "lisas"
+]
+
+
+# =========================
+# DB
+# =========================
+def get_conn():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def init_db():
+    with closing(get_conn()) as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS processed_messages (
+                message_id TEXT PRIMARY KEY,
+                processed_at INTEGER NOT NULL
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS user_state (
+                wa_id TEXT PRIMARY KEY,
+                last_reply_at INTEGER,
+                last_origin TEXT,
+                last_product TEXT
+            )
+        """)
+        conn.commit()
+
+def is_processed_message(message_id):
+    if not message_id:
+        return False
+    with closing(get_conn()) as conn:
+        row = conn.execute(
+            "SELECT 1 FROM processed_messages WHERE message_id = ? LIMIT 1",
+            (message_id,)
+        ).fetchone()
+        return row is not None
+
+def mark_processed_message(message_id):
+    if not message_id:
+        return
+    with closing(get_conn()) as conn:
+        conn.execute(
+            "INSERT OR IGNORE INTO processed_messages (message_id, processed_at) VALUES (?, ?)",
+            (message_id, int(time.time()))
+        )
+        conn.commit()
+
+def get_user_state(wa_id):
+    with closing(get_conn()) as conn:
+        row = conn.execute(
+            "SELECT wa_id, last_reply_at, last_origin, last_product FROM user_state WHERE wa_id = ? LIMIT 1",
+            (wa_id,)
+        ).fetchone()
+        return dict(row) if row else None
+
+def upsert_user_state(wa_id, last_reply_at, last_origin, last_product):
+    with closing(get_conn()) as conn:
+        conn.execute("""
+            INSERT INTO user_state (wa_id, last_reply_at, last_origin, last_product)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(wa_id) DO UPDATE SET
+                last_reply_at = excluded.last_reply_at,
+                last_origin = excluded.last_origin,
+                last_product = excluded.last_product
+        """, (wa_id, last_reply_at, last_origin, last_product))
+        conn.commit()
+
+
+# =========================
+# WhatsApp send helpers
+# =========================
 def send_text(to, body):
     headers = {
         "Authorization": f"Bearer {ACCESS_TOKEN}",
@@ -145,6 +230,10 @@ def send_image(to, media_id):
     print("IMAGE RESPONSE:", response.text)
     return response
 
+
+# =========================
+# Logic helpers
+# =========================
 def normalize_text(text):
     return (text or "").strip().lower()
 
@@ -159,24 +248,111 @@ def get_message_text(message):
         return message.get("text", {}).get("body", "")
     return ""
 
-def detect_ad_product(message, value):
-    candidates = []
-    context = message.get("context", {})
-    referral = message.get("referral", {})
+def extract_strings(obj):
+    found = []
 
-    for obj in [context, referral, value]:
-        if isinstance(obj, dict):
-            for v in obj.values():
-                if isinstance(v, str):
-                    candidates.append(v.lower())
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if isinstance(k, str):
+                found.append(k.lower())
 
+            if isinstance(v, str):
+                found.append(v.lower())
+            elif isinstance(v, dict):
+                found.extend(extract_strings(v))
+            elif isinstance(v, list):
+                for item in v:
+                    found.extend(extract_strings(item))
+
+    elif isinstance(obj, list):
+        for item in obj:
+            found.extend(extract_strings(item))
+
+    return found
+
+def detect_ad_mapping(message, value):
+    """
+    Busca IDs o textos del webhook que coincidan con la biblioteca AD_SOURCE_MAP.
+    """
+    candidates = extract_strings(message) + extract_strings(value)
     joined = " | ".join(candidates)
 
-    for key, product in AD_PRODUCT_MAP.items():
-        if key in joined:
-            return product
+    for known_id_or_key, mapping in AD_SOURCE_MAP.items():
+        if known_id_or_key.lower() in joined:
+            return mapping
 
     return None
+
+def detect_ad_product_by_keywords(message, value):
+    candidates = extract_strings(message) + extract_strings(value)
+    joined = " | ".join(candidates)
+
+    for key in CLIP_KEYWORDS:
+        if key in joined:
+            return "clip"
+
+    for key in MONAS_KEYWORDS:
+        if key in joined:
+            return "6_monas"
+
+    return None
+
+def get_origin_and_product(message, value, text):
+    """
+    Devuelve origin + product.
+    origin puede ser:
+    - organic
+    - ad_clip_main
+    - ad_6_monas_main
+    - ad_clip_unknown
+    - ad_6_monas_unknown
+    """
+    mapped = detect_ad_mapping(message, value)
+    if mapped:
+        return mapped["origin"], mapped["product"]
+
+    keyword_product = detect_ad_product_by_keywords(message, value)
+    if keyword_product == "clip":
+        return "ad_clip_unknown", "clip"
+    if keyword_product == "6_monas":
+        return "ad_6_monas_unknown", "6_monas"
+
+    # Si no vino claro de anuncio, se va como orgánico
+    return "organic", "6_monas"
+
+def should_auto_reply(wa_id, current_origin):
+    user = get_user_state(wa_id)
+
+    if not user:
+        print("DECISION: responder porque es usuario nuevo")
+        return True
+
+    now_ts = int(time.time())
+    last_reply_at = int(user.get("last_reply_at") or 0)
+    last_origin = user.get("last_origin") or ""
+    elapsed = now_ts - last_reply_at
+
+    # Si cambia el origen, sí responde
+    if current_origin != last_origin:
+        print(f"DECISION: responder porque cambió origen ({last_origin} -> {current_origin})")
+        return True
+
+    # Si pasó el cooldown, sí responde
+    if elapsed >= REPLY_COOLDOWN_SECONDS:
+        print(f"DECISION: responder porque pasaron {elapsed} segundos")
+        return True
+
+    # Si es mismo origen y poco tiempo, no responde
+    print(f"DECISION: NO responder. Mismo origen ({current_origin}) y solo han pasado {elapsed} segundos")
+    return False
+
+def mark_reply_sent(wa_id, origin, product):
+    upsert_user_state(
+        wa_id=wa_id,
+        last_reply_at=int(time.time()),
+        last_origin=origin,
+        last_product=product
+    )
 
 def send_block(to, images, pause_each=0.35, pause_after=0.8):
     for media_id in images:
@@ -212,6 +388,10 @@ def send_flow_clip(to):
 
     send_text(to, ASK_CITY)
 
+
+# =========================
+# Routes
+# =========================
 @app.route("/", methods=["GET"])
 def home():
     return "Bot activo", 200
@@ -229,7 +409,7 @@ def verify():
 
 @app.route("/webhook", methods=["POST"])
 def receive():
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     print("WEBHOOK RECIBIDO:", data)
 
     try:
@@ -245,47 +425,53 @@ def receive():
             return "ok", 200
 
         message = value["messages"][0]
-        from_number = message["from"]
+        from_number = message.get("from")
         message_id = message.get("id")
 
-        if message_id and message_id in processed_message_ids:
+        if not from_number:
+            return "ok", 200
+
+        # evitar reprocesar el mismo mensaje exacto
+        if message_id and is_processed_message(message_id):
             print("MENSAJE REPETIDO IGNORADO:", message_id)
             return "ok", 200
 
         if message_id:
-            processed_message_ids.add(message_id)
-
-        if from_number in responded_users:
-            print(f"{from_number} ya recibió respuesta inicial. No responder.")
-            return "ok", 200
+            mark_processed_message(message_id)
 
         text = get_message_text(message)
-        ad_product = detect_ad_product(message, value)
+        origin, product = get_origin_and_product(message, value, text)
+        # PRUEBA TEMPORAL CORTINA
+        origin = "ad_clip_test"
+        product = "clip"
 
         print("NUMERO:", from_number)
         print("TEXTO:", text)
-        print("PRODUCTO DETECTADO:", ad_product)
+        print("ORIGIN:", origin)
+        print("PRODUCT:", product)
 
-        responded_users.add(from_number)
+        # decidir si responder o no
+        #if not should_auto_reply(from_number, origin):
+            #return "ok", 200
 
-        if ad_product == "clip":
+        # enviar flujo
+        if product == "clip":
             send_flow_clip(from_number)
+            mark_reply_sent(from_number, origin, product)
             return "ok", 200
 
-        if ad_product == "6_monas":
-            send_flow_6_monas(from_number)
-            return "ok", 200
-
-        if is_organic_message(text):
-            send_flow_6_monas(from_number)
-            return "ok", 200
-
+        # default: 6 moñas
         send_flow_6_monas(from_number)
+        mark_reply_sent(from_number, origin, product)
+        return "ok", 200
 
     except Exception as e:
         print("ERROR PROCESANDO WEBHOOK:", str(e))
 
     return "ok", 200
+
+
+init_db()
 
 if __name__ == "__main__":
     app.run(port=5000)
